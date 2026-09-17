@@ -1,0 +1,11 @@
+package.xml
+setup.cfg
+setup.py
+resource/thesis_test
+thesis_test/__init__.py
+thesis_test.egg-info/PKG-INFO
+thesis_test.egg-info/SOURCES.txt
+thesis_test.egg-info/dependency_links.txt
+thesis_test.egg-info/requires.txt
+thesis_test.egg-info/top_level.txt
+thesis_test.egg-info/zip-safe

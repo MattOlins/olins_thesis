@@ -1,0 +1,24 @@
+name: olins_ros
+channels:
+  - conda-forge
+  - robostack-jazzy
+  - defaults
+dependencies:
+  - python=3.12
+  - ros-dev-tools
+  - ros-jazzy-desktop
+  - ros-jazzy-nav2-bringup
+  - ros-jazzy-navigation2
+  - ros-jazzy-ros-gz-bridge
+  - ros-jazzy-ros-gz-sim
+  - ros-jazzy-slam-toolbox
+  - setuptools=79.0.1
+  - matplotlib
+  - networkx
+  - numpy
+  - opencv
+  - pandas
+  - pyyaml
+  - scikit-learn
+  - scipy
+prefix: /home/kalgaonp/anaconda3/envs/olins_ros

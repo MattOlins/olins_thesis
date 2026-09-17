@@ -1,0 +1,29 @@
+#Ros build outputs
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+#python
+_pyache_/
+*.pyc
+.pytest_cahce/
+
+#vscode stuff
+.vscode
+.idea/
+
+#os
+.DS_Store
+
+#come back and check this to be certain correct
+datasets/raw/
+
+#ros bags
+*.db3
+*.mcap
+
+#ml checkpoints
+*.pt
+*.pth
+
+*.log
