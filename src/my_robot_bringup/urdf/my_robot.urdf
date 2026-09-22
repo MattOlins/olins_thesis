@@ -18,9 +18,20 @@
     <link name="base_link"> <!--one link must be base link-->
         <visual>
             <geometry>
-                <box size="0.4445 0.4318 0.15" /> <!--Vaugely close to robot specs, 17.5 x 17 x Something-->
+                <box size="0.4445 0.4318 0.05" /> <!--Vaugely close to robot specs, 17.5 x 17 x 2 inches, and ~30lbs-->
             </geometry>
-            <origin xyz= "0 0 0.075" rpy="0 0 0" />
+            <origin xyz= "0 0 0" rpy="0 0 0" />
+            <material name="green" />
+
+        </visual>
+    </link>
+
+    <link name="battery"> <!--one link must be base link-->
+        <visual>
+            <geometry>
+                <box size="0.178 0.203 0.14" /> <!-- battery is 7 x 8 x 5.5 inches, and 12 lbs-->
+            </geometry>
+            <origin xyz= "0 0 0.07" rpy="0 0 0" />
             <material name="green" />
 
         </visual>
@@ -30,7 +41,7 @@
     <link name="lidar">
         <visual>
             <geometry>
-                <cylinder radius=".1" length="0.05" /> <!--made up-->
+                <cylinder radius=".05" length="0.05" /> <!--made up-->
             </geometry>
 
             <origin xyz="0 0 0" rpy="0 0 0" />
@@ -84,11 +95,17 @@
 
 
     <!--JOINT SECTION-->
+    <joint name="base_battery_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="battery" />
+        <origin xyz="-0.111125 0 0" rpy="0 0 0" /> <!--battery sits inside of the base -->
+    </joint>
+
 
     <joint name="base_lidar_joint" type="fixed">
         <parent link="base_link" />
         <child link="lidar" />
-        <origin xyz="0 0 0.175" rpy="0 0 0" /> <!--Change the joint origin first, then possibly touch parent and child -->
+        <origin xyz="0.111125 0 0.05" rpy="0 0 0" /> <!--Change the joint origin first, then possibly touch parent and child -->
     </joint>
 
     <!--Wheel Joints-->
@@ -121,7 +138,7 @@
     <joint name="base_joint" type="fixed">
         <parent link="base_footprint" />
         <child link="base_link" />
-        <origin xyz="0 0 0.089" rpy="0 0 0" />
+        <origin xyz="0 0 0.089" rpy="0 0 0" /> <!--Wheel radius height off the ground-->
     </joint>
 
 </robot>
