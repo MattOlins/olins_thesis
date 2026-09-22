@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<robot name="honors_thesis">
+
+    <material name="grey">
+        <color rgba="0.7 0.7 0.7 1" />
+    </material>
+
+    <material name="green">
+        <color rgba="0.0 0.7 0 1" />
+    </material>
+
+    <material name="white">
+        <color rgba="1 1 1 1" />
+    </material>
+
+    <!--LINK SECTION-->
+    <!--Chasis Link-->
+    <link name="base_link"> <!--one link must be base link-->
+        <visual>
+            <geometry>
+                <box size="0.4445 0.4318 0.15" /> <!--Vaugely close to robot specs, 17.5 x 17 x Something-->
+            </geometry>
+            <origin xyz= "0 0 0.075" rpy="0 0 0" />
+            <material name="green" />
+
+        </visual>
+    </link>
+
+    <!--Lidar Link-->
+    <link name="lidar">
+        <visual>
+            <geometry>
+                <cylinder radius=".1" length="0.05" /> <!--made up-->
+            </geometry>
+
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <material name="white"/>
+        </visual>
+    </link>
+
+    <!--Back Left Wheel-->
+    <link name="back_left_wheel">
+        <visual>
+            <geometry>
+                <cylinder radius="0.089" length="0.05" /><!--rough robotic specs, 7inch diam, 2 inch length-->
+            </geometry>
+            <origin xyz="0 0 0" rpy="1.57 0 0" /> <!--Need wheel to be vertical, using radians-->
+            <material name="grey"/>
+        </visual>
+    </link>
+    <!--Front Left Wheel-->
+    <link name="front_left_wheel">
+        <visual>
+            <geometry>
+                <cylinder radius="0.089" length="0.05" /><!--rough robotic specs, 7inch diam, 2 inch length-->
+            </geometry>
+            <origin xyz="0 0 0" rpy="1.57 0 0" /> <!--Need wheel to be vertical, using radians-->
+            <material name="grey"/>
+        </visual>
+    </link>
+    <!--Back Right Wheel-->
+    <link name="back_right_wheel">
+        <visual>
+            <geometry>
+                <cylinder radius="0.089" length="0.05" />
+            </geometry>
+            <origin xyz="0 0 0" rpy="1.57 0 0" /> 
+            <material name="grey"/>
+        </visual>
+    </link>
+    <!--Front Right Wheel-->
+    <link name="front_right_wheel">
+        <visual>
+            <geometry>
+                <cylinder radius="0.089" length="0.05" />
+            </geometry>
+            <origin xyz="0 0 0" rpy="1.57 0 0" /> 
+            <material name="grey"/>
+        </visual>
+    </link>
+
+    <!--Virtual Link-->
+    <link name="base_footprint" /> <!--Convention name it base_footprint-->
+
+
+    <!--JOINT SECTION-->
+
+    <joint name="base_lidar_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="lidar" />
+        <origin xyz="0 0 0.175" rpy="0 0 0" /> <!--Change the joint origin first, then possibly touch parent and child -->
+    </joint>
+
+    <!--Wheel Joints-->
+    <joint name="base_back_left_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="back_left_wheel" />
+        <origin xyz="-0.111125 0.2309 0" rpy="0 0 0" /> <!--x offset: -1/4 of box, y offset: half of box + half of wheel length (.2259+.025)-->
+        <axis xyz="0 1 0" /> <!--rotation about x-axis -->
+    </joint>
+    <joint name="base_front_left_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="front_left_wheel" />
+        <origin xyz="0.111125 0.2309 0" rpy="0 0 0" /> 
+        <axis xyz="0 1 0" /> 
+    </joint>
+    <joint name="base_back_right_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="back_right_wheel" />
+        <origin xyz="-0.111125 -0.2309 0" rpy="0 0 0" /> 
+        <axis xyz="0 1 0" /> 
+    </joint>
+    <joint name="base_front_right_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="front_right_wheel" />
+        <origin xyz="0.111125 -0.2309 0" rpy="0 0 0" /> 
+        <axis xyz="0 1 0" /> 
+    </joint>
+
+    <!--Virtual Joint-->
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint" />
+        <child link="base_link" />
+        <origin xyz="0 0 0.089" rpy="0 0 0" />
+    </joint>
+
+</robot>
