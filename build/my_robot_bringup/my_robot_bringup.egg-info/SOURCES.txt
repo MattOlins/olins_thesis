@@ -1,0 +1,15 @@
+package.xml
+setup.cfg
+setup.py
+config/bridge.yaml
+launch/sim.launch.py
+my_robot_bringup/__init__.py
+my_robot_bringup.egg-info/PKG-INFO
+my_robot_bringup.egg-info/SOURCES.txt
+my_robot_bringup.egg-info/dependency_links.txt
+my_robot_bringup.egg-info/requires.txt
+my_robot_bringup.egg-info/top_level.txt
+my_robot_bringup.egg-info/zip-safe
+resource/my_robot_bringup
+urdf/my_robot.urdf
+worlds/obstacle_world.sdf

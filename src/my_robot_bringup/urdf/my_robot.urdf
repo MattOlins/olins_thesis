@@ -233,7 +233,7 @@
             <right_joint>base_back_right_wheel_joint</right_joint>
             <right_joint>base_front_right_wheel_joint</right_joint>
 
-            <wheel_seperation>0.305</wheel_seperation>
+            <wheel_separation>0.4618</wheel_separation>
             <wheel_radius>0.089</wheel_radius>
 
             <!--Simulation limits, pull from physical testing later-->
@@ -246,7 +246,7 @@
             <tf_topic>/tf</tf_topic>
 
             <frame_id>odom</frame_id>
-            <child_frame_id>base_link</child_frame_id>
+            <child_frame_id>base_footprint</child_frame_id>
             <odom_publish_frequency>30</odom_publish_frequency>
         </plugin>
     </gazebo>
@@ -259,10 +259,10 @@
             <joint_name>base_front_left_wheel_joint</joint_name>
             <joint_name>base_back_right_wheel_joint</joint_name>
             <joint_name>base_front_right_wheel_joint</joint_name>
-        </pulgin>
+        </plugin>
     </gazebo>
 
-    <gazebo reference="lidar_link"> <!--LiDAR sensor info-->
+    <gazebo reference="lidar"> <!--LiDAR sensor info-->
         <sensor name="lidar" type="gpu_lidar">
             <always_on>true</always_on>
             <update_rate>500</update_rate> <!--go back and look through the physical specifications-->
@@ -273,8 +273,8 @@
                     <horizontal>
                         <samples>720</samples>
                         <resolution>1</resolution>
-                        <min_angle>-3.14159<min_angle>
-                        <max_angle>3.14159<max_angle>
+                        <min_angle>-3.14159</min_angle>
+                        <max_angle>3.14159</max_angle>
                     </horizontal>
                 </scan>
 
@@ -287,6 +287,6 @@
             </lidar>
         </sensor>
     </gazebo>
-
+    
 
 </robot>

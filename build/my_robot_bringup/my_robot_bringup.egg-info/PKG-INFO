@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: my_robot_bringup
+Version: 0.0.1
+Summary: Four-wheel robot simulation and bringup
+Maintainer: kalgaonp
+Maintainer-email: user@example.com
+License: Apache-2.0
+Requires-Dist: setuptools
+Dynamic: license
+Dynamic: maintainer
+Dynamic: maintainer-email
+Dynamic: requires-dist
+Dynamic: summary

@@ -1,0 +1,104 @@
+<?xml version="1.0"?>
+<sdf version="1.8">
+    <world name="vfh_world">
+
+        <!-- Physics information -->
+        <physics name="default_physics" type="ignored">
+            <max_step_size>0.001</max_step_size>
+            <real_time_factor>1.0</real_time_factor>
+        </physics>
+
+        <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+
+        <!-- Allows ROS/Gazebo to insert the robot -->
+        <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+
+        <!-- Publishes the simulation scene -->
+        <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+
+        <!-- Required for the simulated LiDAR -->
+        <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+            <render_engine>ogre2</render_engine>
+        </plugin>
+
+        <!--define gravity -->
+        <gravity>0 0 -9.81</gravity>
+
+        <!-- Ground plane -->
+        <model name="ground_plane">
+            <static>true</static>
+
+            <link name="ground">
+                <visual name="visual">
+                    <geometry>
+                        <plane>
+                            <normal>0 0 1</normal>
+                            <size>30 30</size>
+                        </plane>
+                    </geometry>
+                </visual>
+
+                <collision name="collision">
+                    <geometry>
+                        <plane>
+                            <normal>0 0 1</normal>
+                            <size>30 30</size>
+                        </plane>
+                    </geometry>
+                </collision>
+            </link>
+        </model>
+
+        <!-- An obstacle 2 meters in front of the robot -->
+        <model name="obstacle_1">
+            <static>true</static>
+
+            <pose>2 0 0.5 0 0 0</pose> <!-- pose tag: x y z roll pitch yaw -->
+
+            <link name="body">
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>0.5 0.5 1.0</size>
+                        </box>
+                    </geometry>
+                </visual>
+
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>0.5 0.5 1.0</size>
+                        </box>
+                    </geometry>
+                </collision>
+            </link>
+        </model>
+
+        <!-- A second obstacle offset from the robot -->
+        <model name="obstacle_2">
+            <static>true</static>
+
+            <pose>3.5 1.0 0.5 0 0 0</pose>
+
+            <link name="body">
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>0.5 0.5 1.0</size>
+                        </box>
+                    </geometry>
+                </visual>
+
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>0.5 0.5 1.0</size>
+                        </box>
+                    </geometry>
+                </collision>
+            </link>
+        </model>
+
+    </world>
+
+</sdf>
