@@ -33,11 +33,12 @@
         <!--Mass/Inertia Properties-->
         <inertial>
             <mass value="13.6" />
-            <inertia ixx="0.435" ixy="0" ixz="0" iyy="0.227" iyz="0" izz="0.214" /> <!--Look at Thesis Thoughts document for derivations-->
+            <inertia ixx="0.214" ixy="0" ixz="0" iyy="0.227" iyz="0" izz="0.435" /> <!--Look at Thesis Thoughts document for derivations-->
+                <!-- swapped x and z inertias to try to fix dolphin behavior -->
         </inertial>
     </link>
 
-    <link name="battery"> <!--one link must be base link-->
+    <link name="battery"> 
         <visual>
             <geometry>
                 <box size="0.178 0.203 0.14" /> <!-- battery is 7 x 8 x 5.5 inches, and 12 lbs-->
@@ -47,14 +48,16 @@
         </visual>
 
         <collision>
+            <origin xyz= "0 0 0.07" rpy="0 0 0" />
             <geometry>
                 <box size="0.178 0.203 0.14" />
             </geometry>        
         </collision>
 
         <inertial>
+            <origin xyz= "0 0 0.07" rpy="0 0 0" />
             <mass value="5.44" />
-            <inertia ixx="0.033" ixy="0" ixz="0" iyy="0.0232" iyz="0" izz="0.0276" /> 
+            <inertia ixx="0.0276" ixy="0" ixz="0" iyy="0.0232" iyz="0" izz="0.033" /> 
         </inertial>
     </link>
 
@@ -86,11 +89,12 @@
             <geometry>
                 <cylinder radius="0.089" length="0.05" /><!--rough robotic specs, 7inch diam, 2 inch length-->
             </geometry>
-            <origin xyz="0 0 0" rpy="1.57 0 0" /> <!--Need wheel to be vertical, using radians-->
+            <origin xyz="0 0 0" rpy="1.5708 0 0" /> <!--Need wheel to be vertical, using radians-->
             <material name="grey"/>
         </visual>
 
         <collision>
+            <origin xyz="0 0 0" rpy="1.5708 0 0" />
             <geometry>
                <cylinder radius="0.089" length="0.05" />
             </geometry>        
@@ -98,7 +102,7 @@
 
         <inertial>
             <mass value="0.8" />
-            <inertia ixx="0.00175" ixy="0" ixz="0" iyy="0.00175" iyz="0" izz="0.00317" /> 
+            <inertia ixx="0.00175" ixy="0" ixz="0" iyy="0.00317" iyz="0" izz="0.00175" /> 
         </inertial>
     </link>
     <!--Front Left Wheel-->
@@ -107,11 +111,12 @@
             <geometry>
                 <cylinder radius="0.089" length="0.05" /><!--rough robotic specs, 7inch diam, 2 inch length-->
             </geometry>
-            <origin xyz="0 0 0" rpy="1.57 0 0" /> <!--Need wheel to be vertical, using radians-->
+            <origin xyz="0 0 0" rpy="1.5708 0 0" /> <!--Need wheel to be vertical, using radians-->
             <material name="grey"/>
         </visual>
 
         <collision>
+            <origin xyz="0 0 0" rpy="1.5708 0 0" />
             <geometry>
                <cylinder radius="0.089" length="0.05" />
             </geometry>        
@@ -119,7 +124,7 @@
 
         <inertial>
             <mass value="0.8" />
-            <inertia ixx="0.00175" ixy="0" ixz="0" iyy="0.00175" iyz="0" izz="0.00317" /> 
+            <inertia ixx="0.00175" ixy="0" ixz="0" iyy="0.00317" iyz="0" izz="0.00175" /> 
         </inertial>
     </link>
     <!--Back Right Wheel-->
@@ -128,11 +133,12 @@
             <geometry>
                 <cylinder radius="0.089" length="0.05" />
             </geometry>
-            <origin xyz="0 0 0" rpy="1.57 0 0" /> 
+            <origin xyz="0 0 0" rpy="1.5708 0 0" /> 
             <material name="grey"/>
         </visual>
 
         <collision>
+            <origin xyz="0 0 0" rpy="1.5708 0 0" />
             <geometry>
                <cylinder radius="0.089" length="0.05" />
             </geometry>        
@@ -140,7 +146,7 @@
 
         <inertial>
             <mass value="0.8" />
-            <inertia ixx="0.00175" ixy="0" ixz="0" iyy="0.00175" iyz="0" izz="0.00317" /> 
+            <inertia ixx="0.00175" ixy="0" ixz="0" iyy="0.00317" iyz="0" izz="0.00175" /> 
         </inertial>
     </link>
     <!--Front Right Wheel-->
@@ -149,11 +155,12 @@
             <geometry>
                 <cylinder radius="0.089" length="0.05" />
             </geometry>
-            <origin xyz="0 0 0" rpy="1.57 0 0" /> 
+            <origin xyz="0 0 0" rpy="1.5708 0 0" /> 
             <material name="grey"/>
         </visual>
 
         <collision>
+            <origin xyz="0 0 0" rpy="1.5708 0 0" />
             <geometry>
                <cylinder radius="0.089" length="0.05" />
             </geometry>        
@@ -161,7 +168,7 @@
 
         <inertial>
             <mass value="0.8" />
-            <inertia ixx="0.00175" ixy="0" ixz="0" iyy="0.00175" iyz="0" izz="0.00317" /> 
+            <inertia ixx="0.00175" ixy="0" ixz="0" iyy="0.00317" iyz="0" izz="0.00175" /> 
         </inertial>
     </link>
 
