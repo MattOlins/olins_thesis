@@ -1,9 +1,9 @@
 Metadata-Version: 2.4
 Name: my_robot_bringup
 Version: 0.0.1
-Summary: Four-wheel robot simulation and bringup
+Summary: Bringup for VFH thesis robot
 Maintainer: kalgaonp
-Maintainer-email: user@example.com
+Maintainer-email: your_email@example.com
 License: Apache-2.0
 Requires-Dist: setuptools
 Dynamic: license
