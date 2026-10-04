@@ -228,6 +228,75 @@
 
 
     <!--Gazebo Section-->
+    <!-- Wheel friction -->
+    <gazebo reference="front_left_wheel">
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>1.0</mu2>
+                        <!-- Allow lateral tire scrub -->
+                        <slip1>0.035</slip1>
+                        <!-- Keep good longitudinal traction -->
+                        <slip2>0.0</slip2>
+                        <!-- Cylinder / axle direction -->
+                        <fdir1>0 0 1</fdir1>
+                    </ode>
+                </friction>
+            </surface>
+        </collision>
+    </gazebo>
+    <gazebo reference="back_left_wheel">
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>1.0</mu2>
+                        <!-- Allow lateral tire scrub -->
+                        <slip1>0.035</slip1>
+                        <!-- Keep good longitudinal traction -->
+                        <slip2>0.0</slip2>
+                        <!-- Cylinder / axle direction -->
+                        <fdir1>0 0 1</fdir1>
+                    </ode>
+                </friction>
+            </surface>
+        </collision>
+    </gazebo>
+    <gazebo reference="front_right_wheel">
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>1.0</mu2>
+                        <slip1>0.035</slip1>
+                        <slip2>0.0</slip2>
+                        <fdir1>0 0 1</fdir1>
+                    </ode>
+                </friction>
+            </surface>
+        </collision>
+    </gazebo>
+    <gazebo reference="back_right_wheel">
+        <collision>
+            <surface>
+                <friction>
+                    <ode>
+                        <mu>1.0</mu>
+                        <mu2>1.0</mu2>
+                        <slip1>0.035</slip1>
+                        <slip2>0.0</slip2>
+                        <fdir1>0 0 1</fdir1>
+                    </ode>
+                </friction>
+            </surface>
+        </collision>
+    </gazebo>
+
+
     <gazebo> <!--differential drive stuff-->
         <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive" >
 
@@ -249,14 +318,25 @@
             <max_angular_velocity>1.5</max_angular_velocity>
             <min_angular_velocity>-1.5</min_angular_velocity>
 
-            <odom_topic>/odom</odom_topic>
-            <tf_topic>/tf</tf_topic>
+            <odom_topic>/wheel_odom</odom_topic>
+            <tf_topic>/wheel_odom_tf</tf_topic>
 
-            <frame_id>odom</frame_id>
+            <frame_id>wheel_odom</frame_id>
             <child_frame_id>base_footprint</child_frame_id>
             <odom_publish_frequency>30</odom_publish_frequency>
         </plugin>
+        <plugin
+            filename="gz-sim-odometry-publisher-system"
+            name="gz::sim::systems::OdometryPublisher">
+            <odom_frame>odom</odom_frame>
+            <robot_base_frame>base_footprint</robot_base_frame>
+            <odom_publish_frequency>30</odom_publish_frequency>
+            <odom_topic>/odom</odom_topic>
+            <tf_topic>/odom_tf</tf_topic>
+            <dimensions>2</dimensions>
+        </plugin>
     </gazebo>
+
 
     <gazebo> <!--publishing wheel joint states-->
         <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
@@ -272,7 +352,7 @@
     <gazebo reference="lidar"> <!--LiDAR sensor info-->
         <sensor name="lidar" type="gpu_lidar">
             <always_on>true</always_on>
-            <update_rate>500</update_rate> <!--go back and look through the physical specifications-->
+            <update_rate>10</update_rate> <!--go back and look through the physical specifications-->
 
             <topic>/scan</topic>
             <lidar>

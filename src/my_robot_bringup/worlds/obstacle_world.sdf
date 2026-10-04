@@ -37,7 +37,6 @@
                         </plane>
                     </geometry>
                 </visual>
-
                 <collision name="collision">
                     <geometry>
                         <plane>
@@ -45,6 +44,14 @@
                             <size>30 30</size>
                         </plane>
                     </geometry>
+                    <surface>
+                        <friction>
+                            <ode>
+                                <mu>1.0</mu>
+                                <mu2>1.0</mu2>
+                            </ode>
+                        </friction>
+                    </surface>
                 </collision>
             </link>
         </model>

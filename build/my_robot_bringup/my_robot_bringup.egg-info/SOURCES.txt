@@ -3,7 +3,6 @@ setup.cfg
 setup.py
 config/bridge.yaml
 config/mapper_params_online_async.yaml
-config/slam.yaml
 launch/sim.launch.py
 launch/slam.launch.py
 my_robot_bringup/__init__.py
