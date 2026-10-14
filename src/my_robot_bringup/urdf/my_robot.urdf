@@ -187,8 +187,10 @@
     <joint name="base_lidar_joint" type="fixed">
         <parent link="base_link" />
         <child link="lidar" />
-        <origin xyz="0.111125 0 0.05" rpy="0 0 0" /> <!--Change the joint origin first, then possibly touch parent and child -->
-    </joint>
+        <origin xyz="0.111125 0 0.15" rpy="0 0 0" /> <!--Change the joint origin first, then possibly touch parent and child -->
+            <!--Moved Lidar Sensor to be above the wheel tops so that it wouldn't scan the wheels
+            I think this caused the error where in Rviz robot wouldn't move bc wheels affected scan matching-->
+    </joint> 
 
     <!--Wheel Joints-->
     <joint name="base_back_left_wheel_joint" type="continuous">
@@ -360,8 +362,8 @@
                     <horizontal>
                         <samples>720</samples>
                         <resolution>1</resolution>
-                        <min_angle>-3.14159</min_angle>
-                        <max_angle>3.14159</max_angle>
+                        <min_angle>-1.0472</min_angle> <!--120 degree FOV-->
+                        <max_angle>1.0472</max_angle>
                     </horizontal>
                 </scan>
 

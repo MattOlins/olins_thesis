@@ -69,6 +69,10 @@
                             <size>0.5 0.5 1.0</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>0.5 0.7 0.6 1</ambient>
+                        <diffuse>0.5 0.7 0.6 1</diffuse>
+                    </material>
                 </visual>
 
                 <collision name="collision">
@@ -94,6 +98,10 @@
                             <size>0.5 0.5 1.0</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>0.5 0.7 0.6 1</ambient>
+                        <diffuse>0.5 0.7 0.6 1</diffuse>
+                    </material>
                 </visual>
 
                 <collision name="collision">
@@ -103,6 +111,112 @@
                         </box>
                     </geometry>
                 </collision>
+            </link>
+        </model>
+
+
+        <!--Adding walls around world-->
+                <!-- North wall -->
+        <model name="north_wall">
+            <static>true</static>
+            <pose>0 5 0.5 0 0 0</pose>
+            <link name="wall">
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1.0</size>
+                        </box>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1.0</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>0.6 0.6 0.6 1</ambient>
+                        <diffuse>0.6 0.6 0.6 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model>
+
+        <!-- South wall -->
+        <model name="south_wall">
+            <static>true</static>
+            <pose>0 -5 0.5 0 0 0</pose>
+            <link name="wall">
+                <collision name="collision">
+                <geometry>
+                    <box>
+                    <size>10 0.2 1.0</size>
+                    </box>
+                </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1.0</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>0.6 0.6 0.6 1</ambient>
+                        <diffuse>0.6 0.6 0.6 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model>
+
+        <!-- East wall -->
+        <model name="east_wall">
+            <static>true</static>
+            <pose>5 0 0.5 0 0 0</pose>
+            <link name="wall">
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>0.2 10 1.0</size>
+                        </box>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>0.2 10 1.0</size>
+                        </box>
+                    </geometry>
+                    <material>
+                            <ambient>0.6 0.6 0.6 1</ambient>
+                            <diffuse>0.6 0.6 0.6 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model>
+
+        <!-- West wall -->
+        <model name="west_wall">
+            <static>true</static>
+            <pose>-5 0 0.5 0 0 0</pose>
+            <link name="wall">
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>0.2 10 1.0</size>
+                        </box>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>0.2 10 1.0</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>0.6 0.6 0.6 1</ambient>
+                        <diffuse>0.6 0.6 0.6 1</diffuse>
+                    </material>
+                </visual>
             </link>
         </model>
 
