@@ -1,0 +1,13 @@
+package.xml
+setup.cfg
+setup.py
+config/vfh_params.yaml
+resource/vfh_navigation
+vfh_navigation/__init__.py
+vfh_navigation.egg-info/PKG-INFO
+vfh_navigation.egg-info/SOURCES.txt
+vfh_navigation.egg-info/dependency_links.txt
+vfh_navigation.egg-info/entry_points.txt
+vfh_navigation.egg-info/requires.txt
+vfh_navigation.egg-info/top_level.txt
+vfh_navigation.egg-info/zip-safe

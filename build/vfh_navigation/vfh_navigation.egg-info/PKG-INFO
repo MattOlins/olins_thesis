@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: vfh_navigation
+Version: 0.0.1
+Summary: VFH-based navigation for a skid-steer robot
+Maintainer: kalgaonp
+Maintainer-email: user@example.com
+License: Apache-2.0
+Requires-Dist: setuptools
+Requires-Dist: numpy
+Dynamic: license
+Dynamic: maintainer
+Dynamic: maintainer-email
+Dynamic: requires-dist
+Dynamic: summary

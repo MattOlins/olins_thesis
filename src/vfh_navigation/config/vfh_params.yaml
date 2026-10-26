@@ -1,0 +1,27 @@
+#way of adding parameters without needing hard coded directly in py file
+vfh_node:
+  ros__parameters:
+
+    use_sim_time: true
+
+    # Initial goal in odom coordinates - random
+    goal_x: 4.0
+    goal_y: 0.0
+    goal_tolerance: 0.20
+
+    # Robot geometry - based off physical specs
+    robot_radius: 0.25
+    safety_margin: 0.10
+
+    #random as well
+    influence_distance: 1.50
+    stop_distance: 0.45
+    sector_width_deg: 5.0
+    histogram_threshold: 0.15
+    max_linear_speed: 0.20
+    max_angular_speed: 1.00
+
+    # Steering cost - random
+    goal_weight: 2.0
+    heading_weight: 0.3
+    smoothness_weight: 0.5

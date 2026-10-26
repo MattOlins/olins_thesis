@@ -1,0 +1,2 @@
+[console_scripts]
+vfh_node = vfh_navigation.vfh_node:main
