@@ -1,9 +1,9 @@
 Metadata-Version: 2.4
 Name: vfh_navigation
 Version: 0.0.1
-Summary: VFH-based navigation for a skid-steer robot
+Summary: VFH obstacle avoidance for four-wheel robot
 Maintainer: kalgaonp
-Maintainer-email: user@example.com
+Maintainer-email: olinsmatt@gmail.com
 License: Apache-2.0
 Requires-Dist: setuptools
 Requires-Dist: numpy

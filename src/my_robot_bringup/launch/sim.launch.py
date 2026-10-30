@@ -15,7 +15,7 @@ def generate_launch_description():
 
     # Files belonging to our robot
     urdf_file = os.path.join(pkg_share, "urdf", "my_robot.urdf")
-    world_file = os.path.join(pkg_share, "worlds", "obstacle_world.sdf")
+    world_file = os.path.join(pkg_share, "worlds", "vfh_test_world.sdf")
     bridge_file = os.path.join(pkg_share, "config", "bridge.yaml")
 
     # Read the existing URDF

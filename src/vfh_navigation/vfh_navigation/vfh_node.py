@@ -19,12 +19,12 @@ class VFHNode(Node):
 
         # ROS parameters - all based off physical robot, I so badly need a way to define with variables
         self.declare_parameter('goal_x', 4.0) #set really simple base goal
-        self.declare_parameter('goal_y', 0.0)
+        self.declare_parameter('goal_y', 2.0)
         self.declare_parameter('goal_tolerance', 0.20)
 
         #this should remain semi-permanent since from measured values
         self.declare_parameter('robot_radius', 0.25) #conservative (.25m radius is about 10 inches)
-        self.declare_parameter('safety_margin', 0.10)
+        self.declare_parameter('safety_margin', 0.05)
         self.declare_parameter('influence_distance', 1.50) #tune this
         self.declare_parameter('stop_distance', 0.45)
 

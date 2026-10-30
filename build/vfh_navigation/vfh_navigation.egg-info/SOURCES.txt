@@ -4,6 +4,7 @@ setup.py
 config/vfh_params.yaml
 resource/vfh_navigation
 vfh_navigation/__init__.py
+vfh_navigation/vfh_node.py
 vfh_navigation.egg-info/PKG-INFO
 vfh_navigation.egg-info/SOURCES.txt
 vfh_navigation.egg-info/dependency_links.txt

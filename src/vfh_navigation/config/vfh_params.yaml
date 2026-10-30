@@ -19,9 +19,9 @@ vfh_node:
     sector_width_deg: 5.0
     histogram_threshold: 0.15
     max_linear_speed: 0.20
-    max_angular_speed: 1.00
+    max_angular_speed: 2.00
 
     # Steering cost - random
-    goal_weight: 2.0
+    goal_weight: 1.0
     heading_weight: 0.3
     smoothness_weight: 0.5

@@ -11,9 +11,7 @@ def generate_launch_description():
     vfh_share = get_package_share_directory('vfh_navigation')
 
     # Start Gazebo, robot, SLAM and RViz
-    slam_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(bringup_share, 'launch', 'slam.launch.py'))
-    )
+    slam_launch = IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(bringup_share, 'launch', 'slam.launch.py')))
 
     # VFH parameter file
     vfh_params = os.path.join(vfh_share,'config','vfh_params.yaml')
