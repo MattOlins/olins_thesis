@@ -4,7 +4,7 @@
     <!-- Physics information -->
     <physics name="default_physics" type="ignored">
       <max_step_size>0.001</max_step_size>
-      <real_time_factor>1.0</real_time_factor>
+      <real_time_factor>10.0</real_time_factor>
     </physics>
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
     <!-- Allows ROS/Gazebo to insert the robot -->
@@ -189,19 +189,19 @@
     <!-- Perpendicular blocker forces robot to route around its ends -->
     <model name="spawn_blocker">
       <static>true</static>
-      <pose>1 -.5 0.75 0 0 1.5708</pose>
+      <pose>1 0 0.75 0 0 1.5708</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
             <box>
-              <size>3.0 0.2 1.5</size>
+              <size>1 0.2 1.5</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>3.0 0.2 1.5</size>
+              <size>1 0.2 1.5</size>
             </box>
           </geometry>
           <material>

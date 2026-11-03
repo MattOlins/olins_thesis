@@ -5,7 +5,7 @@ vfh_node:
     use_sim_time: true
 
     # Initial goal in odom coordinates - random
-    goal_x: 4.0
+    goal_x: 10.0
     goal_y: 0.0
     goal_tolerance: 0.20
 
@@ -19,9 +19,16 @@ vfh_node:
     sector_width_deg: 5.0
     histogram_threshold: 0.15
     max_linear_speed: 0.20
-    max_angular_speed: 2.00
+    max_angular_speed: 0.60
 
     # Steering cost - random
-    goal_weight: 1.0
-    heading_weight: 0.3
-    smoothness_weight: 0.5
+    goal_weight: 2.00
+    heading_weight: 1.0
+    smoothness_weight: 1.0
+
+    # Hysteresis and angular damping; adjust one at a time in experiments
+    switch_hysteresis: 0.35
+    turn_side_penalty: 1.2
+    angular_kp: 0.8
+    angular_kd: 0.25
+    angular_accel_limit: 0.8

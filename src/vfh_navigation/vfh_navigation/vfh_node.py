@@ -8,8 +8,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 
 def wrap_angle(angle):
-    """Return an angle in the interval [-1.0472, 1.0472]."""
-    #pull this value from LiDAR range in my_robot file (currently -120 to 120 degrees)
+    """Wrap an angular difference to [-pi, pi]."""
     return math.atan2(math.sin(angle), math.cos(angle))
 
 class VFHNode(Node):
@@ -18,13 +17,13 @@ class VFHNode(Node):
         super().__init__('vfh_node')
 
         # ROS parameters - all based off physical robot, I so badly need a way to define with variables
-        self.declare_parameter('goal_x', 4.0) #set really simple base goal
-        self.declare_parameter('goal_y', 2.0)
+        self.declare_parameter('goal_x', 10.0)  # default; YAML overrides
+        self.declare_parameter('goal_y', 0.0)
         self.declare_parameter('goal_tolerance', 0.20)
 
         #this should remain semi-permanent since from measured values
         self.declare_parameter('robot_radius', 0.25) #conservative (.25m radius is about 10 inches)
-        self.declare_parameter('safety_margin', 0.05)
+        self.declare_parameter('safety_margin', 0.1)
         self.declare_parameter('influence_distance', 1.50) #tune this
         self.declare_parameter('stop_distance', 0.45)
 
@@ -34,9 +33,17 @@ class VFHNode(Node):
         self.declare_parameter('max_angular_speed', 1.00)
 
         #eventually want to tune these with RL
-        self.declare_parameter('goal_weight', 2.0)
-        self.declare_parameter('heading_weight', 0.3)
-        self.declare_parameter('smoothness_weight', 0.5)
+        self.declare_parameter('goal_weight', 3.00)
+        self.declare_parameter('heading_weight', .5)
+        self.declare_parameter('smoothness_weight', .5)
+
+        # Hysteresis and damped turning (initial tuning values).
+        self.declare_parameter('switch_hysteresis', 0.35)
+        self.declare_parameter('turn_side_penalty', 1.2)
+        self.declare_parameter('angular_kp', 0.8)
+        self.declare_parameter('angular_kd', 0.25)
+        self.declare_parameter('angular_accel_limit', 0.8)  # rad/s^2
+
 
 
         #load parameters above
@@ -57,13 +64,30 @@ class VFHNode(Node):
         self.w_goal = float(param('goal_weight'))
         self.w_heading = float(param('heading_weight'))
         self.w_smooth = float(param('smoothness_weight'))
+        self.switch_hysteresis = float(param('switch_hysteresis'))
+        self.turn_side_penalty = float(param('turn_side_penalty'))
+        self.angular_kp = float(param('angular_kp'))
+        self.angular_kd = float(param('angular_kd'))
+        self.angular_accel_limit = float(param('angular_accel_limit'))
 
-        #histogram config
+
+        # Use 5-degree bins across the *observed* 120-degree field of view.
+        # A 120-degree scan DOES NOT mean that the other 240 degrees are clear.
         requested_width = float(param('sector_width_deg'))
-        self.num_sectors = max(8,round(120.0 / requested_width))
-        self.sector_width = (2.0 * math.pi / self.num_sectors)
-        self.sector_angles = (-math.pi + (np.arange(self.num_sectors) + 0.5) * self.sector_width)
-        self.previous_direction = 0.0
+        if requested_width <= 0.0:
+            raise ValueError('sector_width_deg must be positive')
+        self.requested_width = math.radians(requested_width)
+        self.num_sectors = None
+        self.sector_width = None
+        self.sector_angles = None
+        self.scan_angle_min = None
+        self.scan_angle_max = None
+
+        # Persist steering intent in the *odom/world frame*, not base_link.
+        self.previous_world_heading = None
+        self.avoidance_side = 0
+        self.clear_goal_cycles = 0
+        self.last_angular_command = 0.0
 
         # Robot state from publishers
         self.scan = None
@@ -90,6 +114,7 @@ class VFHNode(Node):
 
     #Random functions that are kinda useful
     def publish_stop(self):
+        self.last_angular_command = 0.0
         self.cmd_pub.publish(Twist())
 
     def get_robot_pose(self):
@@ -113,83 +138,134 @@ class VFHNode(Node):
 
         return (0.0 <= scan_age < 0.5 and 0.0 <= odom_age < 0.5)
 
-    #Making polar histogram now
+    def update_scan_geometry(self, scan):
+        # Derive the angular histogram from the real LaserScan limits.
+        # With [-60,+60] degrees and 5-degree requested sectors: 24 bins.
+        if (self.num_sectors is not None and
+                self.scan_angle_min == scan.angle_min and
+                self.scan_angle_max == scan.angle_max):
+            return
+
+        fov = float(scan.angle_max - scan.angle_min)
+        if fov <= 0.0:
+            raise ValueError('LiDAR field of view must be positive')
+        self.num_sectors = max(1, int(round(fov / self.requested_width)))
+        self.sector_width = fov / self.num_sectors
+        self.sector_angles = (
+            float(scan.angle_min) +
+            (np.arange(self.num_sectors) + 0.5) * self.sector_width
+        )
+        self.scan_angle_min = scan.angle_min
+        self.scan_angle_max = scan.angle_max
+
     def build_histogram(self, scan):
+        self.update_scan_geometry(scan)
         density = np.zeros(self.num_sectors, dtype=float)
+        valid_counts = np.zeros(self.num_sectors, dtype=int)
+        total_counts = np.zeros(self.num_sectors, dtype=int)
 
-        observed = np.zeros(self.num_sectors, dtype=bool)
-
-        ranges = np.asarray(scan.ranges,dtype=float)
-
-        bearings = (scan.angle_min + np.arange(len(ranges)) * scan.angle_increment)
-
-        inflated_radius = (self.robot_radius + self.safety_margin)
+        ranges = np.asarray(scan.ranges, dtype=float)
+        bearings = scan.angle_min + np.arange(len(ranges)) * scan.angle_increment
+        inflated_radius = self.robot_radius + self.safety_margin
 
         for distance, bearing in zip(ranges, bearings):
-            # A NaN reading is unknown.
-            # Positive infinity denotes no return within the sensor's measurement range.
-            if np.isnan(distance):
+            idx = int(np.clip(
+                math.floor((bearing - scan.angle_min) / self.sector_width),
+                0, self.num_sectors - 1
+            ))
+            total_counts[idx] += 1
+
+            # NaN / out-of-range data are UNKNOWN, not evidence of clear space.
+            valid = (np.isposinf(distance) or
+                     (np.isfinite(distance) and
+                      scan.range_min <= distance <= scan.range_max))
+            if not valid:
+                continue
+            valid_counts[idx] += 1
+            if np.isposinf(distance) or distance >= self.influence_distance:
                 continue
 
-            if distance < scan.range_min:
-                continue
-
-            if distance > scan.range_max:
-                if not np.isposinf(distance):
-                    continue
-
-            bearing = wrap_angle(float(bearing))
-
-            # Mark this direction as observed - def an easier way to do this
-            index = int(math.floor((bearing + math.pi) / self.sector_width)) % self.num_sectors
-            observed[index] = True
-
-            # An infinite return is treated as clear within the LiDAR's maximum range
-            if np.isposinf(distance):
-                continue
-
-            if distance >= self.influence_distance:
-                continue
-
-            # Inflate obstacles to account for the robot's physical footprint.
-            inflation_angle = math.asin(min(1.0, inflated_radius / max(distance,1e-6)))
-
-            # Distance-weighted obstacle density, again check equation in thesis notes
+            inflation_angle = math.asin(min(1.0, inflated_radius / max(distance, 1e-6)))
             weight = (1.0 - distance / self.influence_distance) ** 2
-            angular_error = np.abs(np.arctan2(np.sin(self.sector_angles - bearing), np.cos(self.sector_angles - bearing)))
-            blocked = (angular_error <= inflation_angle + self.sector_width / 2.0)
-            density[blocked] = np.maximum(density[blocked],weight)
+            angular_error = np.abs(np.arctan2(
+                np.sin(self.sector_angles - bearing),
+                np.cos(self.sector_angles - bearing)
+            ))
+            blocked = angular_error <= inflation_angle + self.sector_width / 2.0
+            density[blocked] = np.maximum(density[blocked], weight)
 
+        # Require at least 80% of a sector's rays to be usable before
+        # considering that sector observed. Adjust if sensor has dropouts.
+        observed = ((total_counts > 0) &
+                    (valid_counts >= 0.80 * total_counts))
         return density, observed
 
-    #Selecting the direction
-    def choose_direction(self,density,observed,goal_angle):
-        # Only consider angular sectors for which the LiDAR supplied measurements.
-        clear = ((density < self.histogram_threshold) & observed)
-
-        #currently im having controller only driver forward and rotate
-        #no reversal or side way movement, yet
-
-        clear = clear & (np.abs(self.sector_angles) < 2.7)
+    def choose_direction(self, density, observed, goal_angle, yaw):
+        clear = (density < self.histogram_threshold) & observed
         candidates = self.sector_angles[clear]
-
         if len(candidates) == 0:
             return None
 
-        costs = []
+        if self.previous_world_heading is None:
+            previous_relative = None
+        else:
+            previous_relative = wrap_angle(self.previous_world_heading - yaw)
 
-        for angle in candidates: #look at notes again!
+        # Check whether the direct goal direction is currently verified clear.
+        # A goal outside the 120-degree scan is unknown, NOT clear.
+        goal_in_fov = (
+            self.sector_angles[0] <= goal_angle <= self.sector_angles[-1]
+        )
+        goal_clear = False
+        if goal_in_fov:
+            idx = int(np.argmin(np.abs(self.sector_angles - goal_angle)))
+            goal_clear = bool(clear[idx])
+
+        if goal_clear and abs(goal_angle) < math.radians(20):
+            self.clear_goal_cycles += 1
+        else:
+            self.clear_goal_cycles = 0
+        if self.clear_goal_cycles >= 10:
+            self.avoidance_side = 0
+
+        costs = np.empty(len(candidates), dtype=float)
+        for i, angle in enumerate(candidates):
             goal_error = abs(wrap_angle(angle - goal_angle))
             heading_error = abs(angle)
-            smoothness_error = abs(wrap_angle(angle - self.previous_direction))
-            cost = (self.w_goal * goal_error + self.w_heading * heading_error+ self.w_smooth * smoothness_error)
-            costs.append(cost)
+            smoothness_error = (0.0 if previous_relative is None else
+                                abs(wrap_angle(angle - previous_relative)))
+            cost = (self.w_goal * goal_error +
+                    self.w_heading * heading_error +
+                    self.w_smooth * smoothness_error)
 
-        best_index = int(np.argmin(costs))
-        best_angle = float(candidates[best_index])
+            # When an obstacle requires steering around it, discourage
+            # alternating between left and right every scan. This is a
+            # penalty, not an absolute ban: safer alternatives remain possible.
+            if self.avoidance_side and np.sign(angle) != self.avoidance_side:
+                cost += self.turn_side_penalty
+            costs[i] = cost
 
-        self.previous_direction = best_angle
-        return best_angle
+        best = int(np.argmin(costs))
+
+        # Preserve the current world-frame steering direction unless another
+        # direction is meaningfully better (hysteresis).
+        if previous_relative is not None:
+            differences = np.abs(np.arctan2(
+                np.sin(candidates - previous_relative),
+                np.cos(candidates - previous_relative)
+            ))
+            old = int(np.argmin(differences))
+            if (differences[old] <= 1.5 * self.sector_width and
+                    costs[old] <= costs[best] + self.switch_hysteresis):
+                best = old
+
+        selected = float(candidates[best])
+        self.previous_world_heading = wrap_angle(yaw + selected)
+
+        if not goal_clear and self.avoidance_side == 0 and abs(selected) > math.radians(15):
+            self.avoidance_side = 1 if selected > 0 else -1
+
+        return selected
 
     #main nav control loop
 
@@ -216,7 +292,7 @@ class VFHNode(Node):
 
         density, observed = self.build_histogram(self.scan)
 
-        selected = self.choose_direction(density,observed,goal_angle)
+        selected = self.choose_direction(density,observed,goal_angle,yaw)
 
         if selected is None:
             # No sufficiently clear direction - this is where I'll define recovering behavior
@@ -247,7 +323,22 @@ class VFHNode(Node):
 
         # put into cmd_vel
         cmd = Twist()
-        cmd.angular.z = float( np.clip(1.2 * selected, -self.max_angular_speed, self.max_angular_speed))
+        # P + yaw-rate damping; then limit change in commanded angular speed.
+        yaw_rate = float(self.odom.twist.twist.angular.z)
+        target_omega = float(np.clip(
+            self.angular_kp * selected - self.angular_kd * yaw_rate,
+            -self.max_angular_speed, self.max_angular_speed
+        ))
+        if (abs(selected) < math.radians(5.0) and
+                abs(goal_angle) < math.radians(5.0)):
+            target_omega = 0.0  # avoid chattering across the central bins
+        dt = 0.1  # timer period (sim seconds)
+        delta_limit = self.angular_accel_limit * dt
+        cmd.angular.z = float(self.last_angular_command + np.clip(
+            target_omega - self.last_angular_command,
+            -delta_limit, delta_limit
+        ))
+        self.last_angular_command = cmd.angular.z
 
         # Move forward only when facing
         # approximately along the selected

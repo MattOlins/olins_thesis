@@ -5,13 +5,14 @@
         <!-- Physics information -->
         <physics name="default_physics" type="ignored">
             <max_step_size>0.001</max_step_size>
-            <real_time_factor>1.0</real_time_factor>
+            <real_time_factor>3.0</real_time_factor>
         </physics>
 
         <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
 
         <!-- Allows ROS/Gazebo to insert the robot -->
         <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+        
 
         <!-- Publishes the simulation scene -->
         <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
@@ -55,7 +56,25 @@
                 </collision>
             </link>
         </model>
-
+        <!--goal marker-->
+        <model name="goal_marker">
+        <static>true</static>
+        <pose>4.0 0.0 0.01 0 0 0</pose>
+        <link name="link">
+            <visual name="visual">
+            <geometry>
+                <cylinder>
+                <radius>0.25</radius>
+                <length>0.02</length>
+                </cylinder>
+            </geometry>
+            <material>
+                <ambient>0 0.8 0 1</ambient>
+                <diffuse>0 0.8 0 1</diffuse>
+            </material>
+            </visual>
+        </link>
+        </model>
         <!-- An obstacle 2 meters in front of the robot -->
         <model name="obstacle_1">
             <static>true</static>
