@@ -4,7 +4,7 @@
 <package format="3">
 
   <name>my_robot_bringup</name>
-  <version>0.0.0</version>
+  <version>0.0.1</version>
   <description>Bringup package for four-wheel skid-steer VFH thesis robot</description>
   <maintainer email="olinsmatt@gmail.com">kalgaonp</maintainer>
   <license>Apache-2.0</license>
@@ -31,6 +31,10 @@
   <exec_depend>rviz2</exec_depend>
 
   <!-- test depandencies  -->
+  <exec_depend>vfh_navigation</exec_depend>
+  <exec_depend>lifecycle_msgs</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

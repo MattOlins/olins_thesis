@@ -1,2 +1,5 @@
 setuptools
 numpy
+
+[test]
+pytest

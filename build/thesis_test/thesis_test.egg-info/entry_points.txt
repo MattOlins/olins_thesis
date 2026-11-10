@@ -1,0 +1,2 @@
+[console_scripts]
+compare_navigation = thesis_test.comparison_runner:main

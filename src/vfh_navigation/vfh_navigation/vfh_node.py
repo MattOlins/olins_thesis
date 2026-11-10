@@ -1,380 +1,305 @@
+"""ROS 2 adapter for the independently testable navigation components."""
+
+from dataclasses import fields
 import math
-import numpy as np
+
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
+from geometry_msgs.msg import PoseStamped, Twist
+from nav_msgs.msg import OccupancyGrid, Odometry, Path
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import DurabilityPolicy, qos_profile_sensor_data, QoSProfile, ReliabilityPolicy
+from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist
+from tf2_ros import Buffer, TransformException, TransformListener
 
-def wrap_angle(angle):
-    """Wrap an angular difference to [-pi, pi]."""
-    return math.atan2(math.sin(angle), math.cos(angle))
+from .geometry import quaternion_yaw, transform_point, wrap_angle
+from .grid_map import GridMap
+from .models import NavigationConfig, Pose2D, ScanData
+from .navigation import Navigator
+
 
 class VFHNode(Node):
+    """Own ROS I/O and provide time-consistent inputs to the navigation core."""
 
     def __init__(self):
         super().__init__('vfh_node')
+        defaults = NavigationConfig()
+        for field in fields(defaults):
+            self.declare_parameter(field.name, getattr(defaults, field.name))
+        for name, value in (
+                ('navigation_mode', 'vfh'), ('goal_x', 10.0), ('goal_y', 0.0),
+                ('goal_frame', 'odom'), ('odom_frame', 'odom'),
+                ('map_frame', 'map'), ('base_frame', 'base_footprint'),
+                ('require_map', False)):
+            self.declare_parameter(name, value)
+        self.config = NavigationConfig(**{
+            field.name: self.get_parameter(field.name).value for field in fields(defaults)})
+        self.mode = self.get_parameter('navigation_mode').value
+        self.require_map = self.get_parameter('require_map').value
+        self.odom_frame = self.get_parameter('odom_frame').value
+        self.map_frame = self.get_parameter('map_frame').value
+        self.base_frame = self.get_parameter('base_frame').value
+        self.navigator = Navigator(self.config, self.mode)
+        self.tf_buffer = Buffer(node=self)
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.scan = self.odom = None
+        self.scan_received = self.odom_received = None
+        self.last_tick = None
+        self.map_error = None
+        self.map_received = False
+        self.goal = PoseStamped()
+        self.goal.header.frame_id = self.get_parameter('goal_frame').value
+        self.goal.pose.position.x = float(self.get_parameter('goal_x').value)
+        self.goal.pose.position.y = float(self.get_parameter('goal_y').value)
+        self.goal.pose.orientation.w = 1.0
+        self.resolved_goal = None
+        self.published_path_revision = -1
+        self.last_state = None
+        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        retained = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
+                              reliability=ReliabilityPolicy.RELIABLE)
+        self.path_pub = self.create_publisher(Path, '/global_path', retained)
+        self.target_pub = self.create_publisher(PoseStamped, '/local_goal', 10)
+        self.state_pub = self.create_publisher(DiagnosticArray, '/navigation_state', 10)
+        self.scan_sub = self.create_subscription(
+            LaserScan, '/scan', self.scan_callback, qos_profile_sensor_data)
+        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_callback, retained)
+        self.goal_sub = self.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, 10)
+        self.timer = self.create_timer(0.1, self.control_loop)
+        self.get_logger().info(f'Navigation started: {self.mode}; awaiting sensor data and TF')
 
-        # ROS parameters - all based off physical robot, I so badly need a way to define with variables
-        self.declare_parameter('goal_x', 10.0)  # default; YAML overrides
-        self.declare_parameter('goal_y', 0.0)
-        self.declare_parameter('goal_tolerance', 0.20)
+    def scan_callback(self, message):
+        """Cache the latest scan and its ROS receipt time."""
+        self.scan = message
+        self.scan_received = self.get_clock().now().nanoseconds/1e9
 
-        #this should remain semi-permanent since from measured values
-        self.declare_parameter('robot_radius', 0.25) #conservative (.25m radius is about 10 inches)
-        self.declare_parameter('safety_margin', 0.1)
-        self.declare_parameter('influence_distance', 1.50) #tune this
-        self.declare_parameter('stop_distance', 0.45)
+    def odom_callback(self, message):
+        """Cache odometry without running control inside the subscription."""
+        self.odom = message
+        self.odom_received = self.get_clock().now().nanoseconds/1e9
 
-        self.declare_parameter('sector_width_deg', 5.0) #i assigned these randomly
-        self.declare_parameter('histogram_threshold', 0.15)
-        self.declare_parameter('max_linear_speed', 0.30)
-        self.declare_parameter('max_angular_speed', 1.00)
+    def map_callback(self, message):
+        """Copy map data without passing mutable ROS arrays to the planning worker."""
+        self.map_received = bool(
+            message.header.frame_id == self.map_frame and message.info.width > 0 and
+            message.info.height > 0 and
+            len(message.data) == message.info.width*message.info.height)
+        if self.mode != 'vfh_astar':
+            return
+        try:
+            if message.header.frame_id != self.map_frame:
+                raise ValueError('unexpected map frame')
+            origin = message.info.origin
+            q = origin.orientation
+            yaw = quaternion_yaw(q.x, q.y, q.z, q.w)
+            if abs(q.x) > 1e-5 or abs(q.y) > 1e-5:
+                raise ValueError('map origin must be planar')
+            grid = GridMap.from_data(
+                message.data, message.info.width, message.info.height,
+                message.info.resolution, Pose2D(origin.position.x, origin.position.y, yaw),
+                self.config.safe_radius, self.config.free_threshold)
+            self.navigator.set_map(grid)
+            self.map_error = None
+        except ValueError as error:
+            self.map_error = f'invalid_map: {error}'
+            self.navigator.invalidate('invalid_map')
 
-        #eventually want to tune these with RL
-        self.declare_parameter('goal_weight', 3.00)
-        self.declare_parameter('heading_weight', .5)
-        self.declare_parameter('smoothness_weight', .5)
+    def goal_callback(self, message):
+        """Replace the final goal and invalidate all previous episode state."""
+        coordinates = message.pose.position.x, message.pose.position.y
+        if not message.header.frame_id or not all(math.isfinite(v) for v in coordinates):
+            self.get_logger().error('Rejected goal with missing frame or nonfinite coordinates')
+            return
+        self.goal = message
+        self.resolved_goal = None
+        self.navigator.reset(preserve_obstacles=True)
+        self.publish_stop()
+        self.publish_path()
 
-        # Hysteresis and damped turning (initial tuning values).
-        self.declare_parameter('switch_hysteresis', 0.35)
-        self.declare_parameter('turn_side_penalty', 1.2)
-        self.declare_parameter('angular_kp', 0.8)
-        self.declare_parameter('angular_kd', 0.25)
-        self.declare_parameter('angular_accel_limit', 0.8)  # rad/s^2
+    def lookup(self, target, source, stamp=None):
+        """Return planar TF without a blocking wait in the control timer."""
+        if target == source:
+            return Pose2D()
+        transform = self.tf_buffer.lookup_transform(target, source, stamp or Time()).transform
+        q = transform.rotation
+        return Pose2D(transform.translation.x, transform.translation.y,
+                      quaternion_yaw(q.x, q.y, q.z, q.w))
 
+    def scan_transform(self):
+        """Compensate robot motion between scan acquisition and the odometry sample."""
+        transform = self.tf_buffer.lookup_transform_full(
+            self.base_frame, Time.from_msg(self.odom.header.stamp),
+            self.scan.header.frame_id, Time.from_msg(self.scan.header.stamp),
+            self.odom_frame).transform
+        q = transform.rotation
+        return Pose2D(transform.translation.x, transform.translation.y,
+                      quaternion_yaw(q.x, q.y, q.z, q.w))
 
+    def resolve_goal(self):
+        """Freeze relative-frame goals once; preserve map/odom goal semantics."""
+        if self.resolved_goal is not None:
+            return self.resolved_goal
+        source = self.goal.header.frame_id
+        canonical = self.map_frame if self.mode == 'vfh_astar' else (
+            self.map_frame if source == self.map_frame else self.odom_frame)
+        transform = self.lookup(canonical, source, Time.from_msg(self.goal.header.stamp))
+        point = transform_point((self.goal.pose.position.x, self.goal.pose.position.y), transform)
+        self.resolved_goal = canonical, point
+        return self.resolved_goal
 
-        #load parameters above
-        def param(name):
-            return self.get_parameter(name).value
+    def data_is_fresh(self, now):
+        """Check receipt and acquisition ages in simulation time."""
+        inputs = (self.scan, self.scan_received), (self.odom, self.odom_received)
+        for message, received in inputs:
+            if message is None or received is None:
+                return False
+            acquired = Time.from_msg(message.header.stamp).nanoseconds/1e9
+            if not (0 <= now-received < self.config.sensor_timeout and
+                    -0.05 <= now-acquired < self.config.sensor_timeout):
+                return False
+        return True
 
-        #these are from equations in thesis notes doc
-        self.goal_x = float(param('goal_x'))
-        self.goal_y = float(param('goal_y'))
-        self.goal_tolerance = float(param('goal_tolerance'))
-        self.robot_radius = float(param('robot_radius'))
-        self.safety_margin = float(param('safety_margin'))
-        self.influence_distance = float(param('influence_distance'))
-        self.stop_distance = float(param('stop_distance'))
-        self.max_linear_speed = float(param('max_linear_speed'))
-        self.max_angular_speed = float(param('max_angular_speed'))
-        self.histogram_threshold = float(param('histogram_threshold'))
-        self.w_goal = float(param('goal_weight'))
-        self.w_heading = float(param('heading_weight'))
-        self.w_smooth = float(param('smoothness_weight'))
-        self.switch_hysteresis = float(param('switch_hysteresis'))
-        self.turn_side_penalty = float(param('turn_side_penalty'))
-        self.angular_kp = float(param('angular_kp'))
-        self.angular_kd = float(param('angular_kd'))
-        self.angular_accel_limit = float(param('angular_accel_limit'))
-
-
-        # Use 5-degree bins across the *observed* 120-degree field of view.
-        # A 120-degree scan DOES NOT mean that the other 240 degrees are clear.
-        requested_width = float(param('sector_width_deg'))
-        if requested_width <= 0.0:
-            raise ValueError('sector_width_deg must be positive')
-        self.requested_width = math.radians(requested_width)
-        self.num_sectors = None
-        self.sector_width = None
-        self.sector_angles = None
-        self.scan_angle_min = None
-        self.scan_angle_max = None
-
-        # Persist steering intent in the *odom/world frame*, not base_link.
-        self.previous_world_heading = None
-        self.avoidance_side = 0
-        self.clear_goal_cycles = 0
-        self.last_angular_command = 0.0
-
-        # Robot state from publishers
-        self.scan = None
-        self.odom = None
-        self.last_scan_time = None
-        self.last_odom_time = None
-
-        # ros subscribers
-        self.scan_sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos_profile_sensor_data)
-        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10) #might want to use wheel odom here instead
-        #publisher
-        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10) # Run controller at 10 Hz, affects line below too
-        self.timer = self.create_timer(0.1, self.control_loop) 
-
-        self.get_logger().info('VFH navigation node started')
-
-    #sensor calls
-    def scan_callback(self, msg):
-        self.scan = msg
-        self.last_scan_time = (self.get_clock().now())
-    def odom_callback(self, msg):
-        self.odom = msg
-        self.last_odom_time = (self.get_clock().now())
-
-    #Random functions that are kinda useful
     def publish_stop(self):
-        self.last_angular_command = 0.0
+        """Publish an immediate zero command."""
+        self.navigator.controller.velocity.reset()
         self.cmd_pub.publish(Twist())
 
-    def get_robot_pose(self):
-        p = self.odom.pose.pose.position
-        q = self.odom.pose.pose.orientation
-        # Quaternion to planar yaw - remember ece414 drone project
-        yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y**2 + q.z**2))
-        return p.x, p.y, yaw
-
-    def data_is_fresh(self):
-        if self.scan is None or self.odom is None:
-            return False
-
-        if (self.last_scan_time is None or self.last_odom_time is None):
-            return False
-
-        #timestamp things
-        now = self.get_clock().now()
-        scan_age = (now - self.last_scan_time).nanoseconds / 1e9
-        odom_age = (now - self.last_odom_time).nanoseconds / 1e9
-
-        return (0.0 <= scan_age < 0.5 and 0.0 <= odom_age < 0.5)
-
-    def update_scan_geometry(self, scan):
-        # Derive the angular histogram from the real LaserScan limits.
-        # With [-60,+60] degrees and 5-degree requested sectors: 24 bins.
-        if (self.num_sectors is not None and
-                self.scan_angle_min == scan.angle_min and
-                self.scan_angle_max == scan.angle_max):
+    def publish_path(self):
+        """Publish accepted routes and explicit invalidations once per revision."""
+        if self.published_path_revision == self.navigator.path_revision:
             return
+        message = Path()
+        message.header.frame_id = self.map_frame
+        message.header.stamp = self.get_clock().now().to_msg()
+        route = self.navigator.follower.path
+        for index, point in enumerate(route):
+            pose = PoseStamped()
+            pose.header = message.header
+            pose.pose.position.x, pose.pose.position.y = point
+            next_point = route[min(index+1, len(route)-1)]
+            angle = math.atan2(next_point[1]-point[1], next_point[0]-point[0])
+            pose.pose.orientation.z = math.sin(angle/2)
+            pose.pose.orientation.w = math.cos(angle/2)
+            message.poses.append(pose)
+        self.path_pub.publish(message)
+        self.published_path_revision = self.navigator.path_revision
 
-        fov = float(scan.angle_max - scan.angle_min)
-        if fov <= 0.0:
-            raise ValueError('LiDAR field of view must be positive')
-        self.num_sectors = max(1, int(round(fov / self.requested_width)))
-        self.sector_width = fov / self.num_sectors
-        self.sector_angles = (
-            float(scan.angle_min) +
-            (np.arange(self.num_sectors) + 0.5) * self.sector_width
-        )
-        self.scan_angle_min = scan.angle_min
-        self.scan_angle_max = scan.angle_max
-
-    def build_histogram(self, scan):
-        self.update_scan_geometry(scan)
-        density = np.zeros(self.num_sectors, dtype=float)
-        valid_counts = np.zeros(self.num_sectors, dtype=int)
-        total_counts = np.zeros(self.num_sectors, dtype=int)
-
-        ranges = np.asarray(scan.ranges, dtype=float)
-        bearings = scan.angle_min + np.arange(len(ranges)) * scan.angle_increment
-        inflated_radius = self.robot_radius + self.safety_margin
-
-        for distance, bearing in zip(ranges, bearings):
-            idx = int(np.clip(
-                math.floor((bearing - scan.angle_min) / self.sector_width),
-                0, self.num_sectors - 1
-            ))
-            total_counts[idx] += 1
-
-            # NaN / out-of-range data are UNKNOWN, not evidence of clear space.
-            valid = (np.isposinf(distance) or
-                     (np.isfinite(distance) and
-                      scan.range_min <= distance <= scan.range_max))
-            if not valid:
-                continue
-            valid_counts[idx] += 1
-            if np.isposinf(distance) or distance >= self.influence_distance:
-                continue
-
-            inflation_angle = math.asin(min(1.0, inflated_radius / max(distance, 1e-6)))
-            weight = (1.0 - distance / self.influence_distance) ** 2
-            angular_error = np.abs(np.arctan2(
-                np.sin(self.sector_angles - bearing),
-                np.cos(self.sector_angles - bearing)
-            ))
-            blocked = angular_error <= inflation_angle + self.sector_width / 2.0
-            density[blocked] = np.maximum(density[blocked], weight)
-
-        # Require at least 80% of a sector's rays to be usable before
-        # considering that sector observed. Adjust if sensor has dropouts.
-        observed = ((total_counts > 0) &
-                    (valid_counts >= 0.80 * total_counts))
-        return density, observed
-
-    def choose_direction(self, density, observed, goal_angle, yaw):
-        clear = (density < self.histogram_threshold) & observed
-        candidates = self.sector_angles[clear]
-        if len(candidates) == 0:
-            return None
-
-        if self.previous_world_heading is None:
-            previous_relative = None
-        else:
-            previous_relative = wrap_angle(self.previous_world_heading - yaw)
-
-        # Check whether the direct goal direction is currently verified clear.
-        # A goal outside the 120-degree scan is unknown, NOT clear.
-        goal_in_fov = (
-            self.sector_angles[0] <= goal_angle <= self.sector_angles[-1]
-        )
-        goal_clear = False
-        if goal_in_fov:
-            idx = int(np.argmin(np.abs(self.sector_angles - goal_angle)))
-            goal_clear = bool(clear[idx])
-
-        if goal_clear and abs(goal_angle) < math.radians(20):
-            self.clear_goal_cycles += 1
-        else:
-            self.clear_goal_cycles = 0
-        if self.clear_goal_cycles >= 10:
-            self.avoidance_side = 0
-
-        costs = np.empty(len(candidates), dtype=float)
-        for i, angle in enumerate(candidates):
-            goal_error = abs(wrap_angle(angle - goal_angle))
-            heading_error = abs(angle)
-            smoothness_error = (0.0 if previous_relative is None else
-                                abs(wrap_angle(angle - previous_relative)))
-            cost = (self.w_goal * goal_error +
-                    self.w_heading * heading_error +
-                    self.w_smooth * smoothness_error)
-
-            # When an obstacle requires steering around it, discourage
-            # alternating between left and right every scan. This is a
-            # penalty, not an absolute ban: safer alternatives remain possible.
-            if self.avoidance_side and np.sign(angle) != self.avoidance_side:
-                cost += self.turn_side_penalty
-            costs[i] = cost
-
-        best = int(np.argmin(costs))
-
-        # Preserve the current world-frame steering direction unless another
-        # direction is meaningfully better (hysteresis).
-        if previous_relative is not None:
-            differences = np.abs(np.arctan2(
-                np.sin(candidates - previous_relative),
-                np.cos(candidates - previous_relative)
-            ))
-            old = int(np.argmin(differences))
-            if (differences[old] <= 1.5 * self.sector_width and
-                    costs[old] <= costs[best] + self.switch_hysteresis):
-                best = old
-
-        selected = float(candidates[best])
-        self.previous_world_heading = wrap_angle(yaw + selected)
-
-        if not goal_clear and self.avoidance_side == 0 and abs(selected) > math.radians(15):
-            self.avoidance_side = 1 if selected > 0 else -1
-
-        return selected
-
-    #main nav control loop
+    def publish_result(self, result):
+        """Publish command, local target, and structured diagnostics at 10 Hz."""
+        command = Twist()
+        command.linear.x = result.local.command.linear
+        command.angular.z = result.local.command.angular
+        self.cmd_pub.publish(command)
+        if result.target is not None:
+            target = PoseStamped()
+            target.header.frame_id = self.odom_frame
+            target.header.stamp = self.get_clock().now().to_msg()
+            target.pose.position.x, target.pose.position.y = result.target
+            target.pose.orientation.w = 1.0
+            self.target_pub.publish(target)
+        diagnostics = DiagnosticArray()
+        diagnostics.header.stamp = self.get_clock().now().to_msg()
+        status = DiagnosticStatus()
+        status.name, status.hardware_id = 'navigation', 'four_wheel_robot'
+        status.level = (DiagnosticStatus.ERROR if result.state == 'FAILED' else
+                        DiagnosticStatus.WARN if result.state in ('BLOCKED', 'WAITING') else
+                        DiagnosticStatus.OK)
+        status.message = result.reason
+        histogram = result.local.histogram
+        values = {
+            'state': result.state, 'reason': result.reason, 'mode': self.mode,
+            'remaining_distance': result.remaining, 'progress': result.progress,
+            'selected_steering': result.local.selected,
+            'observed_clearance': histogram.clearance if histogram else math.nan,
+            'replan_count': self.navigator.replan_count,
+            'stuck_replans': self.navigator.stuck_replans,
+            'turn_reversals': result.turn_reversals,
+            'map_revision': self.navigator.map_revision,
+            'goal_revision': self.navigator.goal_revision,
+            'remembered_obstacles': len(self.navigator.controller.obstacle_memory),
+        }
+        status.values = [KeyValue(key=k, value=str(v)) for k, v in values.items()]
+        diagnostics.status = [status]
+        self.state_pub.publish(diagnostics)
+        state = result.state, result.reason
+        if state != self.last_state:
+            self.get_logger().info(f'{result.state}: {result.reason}')
+            self.last_state = state
+        self.publish_path()
 
     def control_loop(self):
-        # Stop on missing or stale data.
-        if not self.data_is_fresh():
-            self.publish_stop()
+        """Capture sensor geometry/TF and advance the navigation core once."""
+        now = self.get_clock().now().nanoseconds/1e9
+        dt = 0.1 if self.last_tick is None else now-self.last_tick
+        if dt < 0:
+            self.navigator.reset()
+            self.tf_buffer.clear()
+            self.resolved_goal = None
+            self.scan = self.odom = None
+            self.scan_received = self.odom_received = None
+            self.map_received = False
+        self.last_tick = now
+        if not self.data_is_fresh(now):
+            self.publish_result(self.navigator.waiting('missing_or_stale_sensor_data'))
             return
-
-        x, y, yaw = self.get_robot_pose()
-
-        # Goal is expressed in the odom frame.
-        dx = self.goal_x - x
-        dy = self.goal_y - y
-
-        distance_to_goal = math.hypot(dx,dy)
-
-        if distance_to_goal < self.goal_tolerance:
-            self.publish_stop()
+        if self.map_error:
+            self.publish_result(self.navigator.waiting(self.map_error))
             return
-
-        # Convert the world-relative goal into a robot-relative direction.
-        goal_angle = wrap_angle(math.atan2(dy, dx) - yaw)
-
-        density, observed = self.build_histogram(self.scan)
-
-        selected = self.choose_direction(density,observed,goal_angle,yaw)
-
-        if selected is None:
-            # No sufficiently clear direction - this is where I'll define recovering behavior
-            self.publish_stop()
+        if self.require_map and not self.map_received:
+            self.publish_result(self.navigator.waiting('missing_map'))
             return
+        try:
+            if self.odom.header.frame_id != self.odom_frame:
+                raise ValueError('unexpected odometry frame')
+            if self.odom.child_frame_id != self.base_frame:
+                raise ValueError('odometry child frame must match base_frame')
+            p, q = self.odom.pose.pose.position, self.odom.pose.pose.orientation
+            pose = Pose2D(p.x, p.y, quaternion_yaw(q.x, q.y, q.z, q.w))
+            scan_transform = self.scan_transform()
+            scan = ScanData(tuple(self.scan.ranges), self.scan.angle_min, self.scan.angle_max,
+                            self.scan.angle_increment, self.scan.range_min, self.scan.range_max,
+                            scan_transform)
+            frame, final_goal = self.resolve_goal()
+            goal_to_odom = self.lookup(
+                self.odom_frame, frame, Time.from_msg(self.odom.header.stamp))
+            final_odom = transform_point(final_goal, goal_to_odom)
+            map_pose = map_goal = map_to_odom = None
+            if self.mode == 'vfh_astar':
+                map_to_odom = goal_to_odom
+                odom_to_map = self.lookup(self.map_frame, self.odom_frame,
+                                          Time.from_msg(self.odom.header.stamp))
+                x, y = transform_point((pose.x, pose.y), odom_to_map)
+                map_pose = Pose2D(x, y, wrap_angle(pose.yaw+odom_to_map.yaw))
+                map_goal = final_goal
+            result = self.navigator.step(scan, pose, self.odom.twist.twist.angular.z,
+                                         final_odom, dt, now, map_pose, map_goal, map_to_odom)
+        except (TransformException, ValueError) as error:
+            result = self.navigator.waiting(f'missing_tf_or_invalid_input: {error}')
+        self.publish_result(result)
 
-        # forward collsion checkS
-        ranges = np.asarray(self.scan.ranges,dtype=float)
-        bearings = (self.scan.angle_min+ np.arange(len(ranges))* self.scan.angle_increment)
+    def destroy_node(self):
+        """Join the planner worker and release ROS entities."""
+        self.navigator.close()
+        return super().destroy_node()
 
-        #full inflated robot width to define a conservative forward arc.
-        forward_half_angle = math.atan2(self.robot_radius + self.safety_margin, max(self.stop_distance, 0.01))
-        forward_mask = (np.abs(bearings) <= forward_half_angle)
-        forward_ranges = ranges[forward_mask]
-        finite_ranges = forward_ranges[np.isfinite(forward_ranges) & (forward_ranges >= self.scan.range_min) & (forward_ranges <= self.scan.range_max)]
-
-        # Unknown forward observations do not authorize forward motion. what is this doing...
-        forward_observed = observed[np.abs(self.sector_angles) <= forward_half_angle].all()
-
-        if not forward_observed:
-            self.publish_stop()
-            return
-
-        if len(finite_ranges) > 0:
-            front_distance = float(np.min(finite_ranges))
-        else:
-            front_distance = float('inf')
-
-        # put into cmd_vel
-        cmd = Twist()
-        # P + yaw-rate damping; then limit change in commanded angular speed.
-        yaw_rate = float(self.odom.twist.twist.angular.z)
-        target_omega = float(np.clip(
-            self.angular_kp * selected - self.angular_kd * yaw_rate,
-            -self.max_angular_speed, self.max_angular_speed
-        ))
-        if (abs(selected) < math.radians(5.0) and
-                abs(goal_angle) < math.radians(5.0)):
-            target_omega = 0.0  # avoid chattering across the central bins
-        dt = 0.1  # timer period (sim seconds)
-        delta_limit = self.angular_accel_limit * dt
-        cmd.angular.z = float(self.last_angular_command + np.clip(
-            target_omega - self.last_angular_command,
-            -delta_limit, delta_limit
-        ))
-        self.last_angular_command = cmd.angular.z
-
-        # Move forward only when facing
-        # approximately along the selected
-        # collision-free direction.
-
-        if abs(selected) < 0.45:
-            cmd.linear.x = ( self.max_linear_speed * max( 0.0, 1.0 - abs(selected) / 0.45) )
-
-        else:
-            # Rotate in place toward the
-            # selected direction.
-            cmd.linear.x = 0.0
-
-        # Emergency stop for nearby obstacles.
-        if front_distance < self.stop_distance:
-            cmd.linear.x = 0.0
-
-        # Stop if any invalid measurement is present in the forward arc.
-        if np.any(~np.isfinite(forward_ranges) & ~np.isposinf(forward_ranges)):
-            cmd.linear.x = 0.0
-
-        self.cmd_pub.publish(cmd)
 
 def main(args=None):
+    """Run the ROS adapter and always issue a shutdown stop."""
     rclpy.init(args=args)
     node = VFHNode()
     try:
         rclpy.spin(node)
-
     except KeyboardInterrupt:
         pass
-
     finally:
-        node.publish_stop()
+        if rclpy.ok():
+            node.publish_stop()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

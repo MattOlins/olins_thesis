@@ -1,0 +1,12 @@
+name: u_world
+world: vfh_test_world.sdf
+initial_pose:
+- 0.0
+- 0.0
+- 0.0
+goal:
+  frame: map
+  x: 10.0
+  y: 0.0
+timeout: 360.0
+saved_pose_graph: maps/u_world

@@ -1,11 +1,12 @@
 Metadata-Version: 2.4
 Name: my_robot_bringup
 Version: 0.0.1
-Summary: Four-wheel skid-steer robot bringup
+Summary: Four-wheel skid-steer robot bringup and navigation scenarios
 Maintainer: molins
 Maintainer-email: olinsmatt@gmail.com
 License: Apache-2.0
 Requires-Dist: setuptools
+Requires-Dist: PyYAML
 Dynamic: license
 Dynamic: maintainer
 Dynamic: maintainer-email

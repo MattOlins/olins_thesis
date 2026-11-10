@@ -1,1 +1,1 @@
-rclpy:std_msgs
+ament_index_python:diagnostic_msgs:geometry_msgs:my_robot_bringup:nav_msgs:python3-yaml:rclpy:ros2launch:rosbag2:rosgraph_msgs:sensor_msgs:std_msgs:tf2_ros

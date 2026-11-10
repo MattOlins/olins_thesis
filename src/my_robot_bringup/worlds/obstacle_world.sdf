@@ -5,7 +5,7 @@
         <!-- Physics information -->
         <physics name="default_physics" type="ignored">
             <max_step_size>0.001</max_step_size>
-            <real_time_factor>3.0</real_time_factor>
+            <real_time_factor>1.0</real_time_factor>
         </physics>
 
         <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
@@ -137,7 +137,7 @@
         <model name="obstacle_3">
             <static>true</static>
 
-            <pose>2 -1.0 0.5 0 0 0</pose>
+            <pose>3 -1.0 0.5 0 0 0</pose>
 
             <link name="body">
                 <visual name="visual">

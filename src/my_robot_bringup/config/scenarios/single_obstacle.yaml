@@ -1,0 +1,12 @@
+name: single_obstacle
+world: single_obstacle.sdf
+initial_pose:
+- 0.0
+- 0.0
+- 0.0
+goal:
+  frame: map
+  x: 4.0
+  y: 0.0
+timeout: 180.0
+saved_pose_graph: maps/single_obstacle

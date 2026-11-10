@@ -1,3 +1,5 @@
+from glob import glob
+
 from setuptools import find_packages, setup
 
 package_name = 'thesis_test'
@@ -10,13 +12,14 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/validation', glob('validation/*.json')),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'PyYAML'],
     zip_safe=True,
     maintainer='kalgaonp',
     maintainer_email='dengqi@lafayette.edu',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='Repeatable VFH and A* comparison recording',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',
@@ -24,6 +27,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'compare_navigation = thesis_test.comparison_runner:main',
         ],
     },
 )

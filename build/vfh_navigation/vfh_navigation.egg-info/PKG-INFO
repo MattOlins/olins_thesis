@@ -1,14 +1,17 @@
 Metadata-Version: 2.4
 Name: vfh_navigation
 Version: 0.0.1
-Summary: VFH obstacle avoidance for four-wheel robot
+Summary: Modular 120-degree VFH and occupancy-grid A* navigation
 Maintainer: kalgaonp
 Maintainer-email: olinsmatt@gmail.com
 License: Apache-2.0
 Requires-Dist: setuptools
 Requires-Dist: numpy
+Provides-Extra: test
+Requires-Dist: pytest; extra == "test"
 Dynamic: license
 Dynamic: maintainer
 Dynamic: maintainer-email
+Dynamic: provides-extra
 Dynamic: requires-dist
 Dynamic: summary

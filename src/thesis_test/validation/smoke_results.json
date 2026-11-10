@@ -1,0 +1,82 @@
+{
+  "date": "2026-11-03",
+  "ros": "Jazzy",
+  "lidar_fov_degrees": 120,
+  "robot_radius_m": 0.33,
+  "safety_margin_m": 0.1,
+  "artifacts_directory": "/tmp/vfh_validation",
+  "paired_open_field": [
+    {
+      "scenario": "open_field",
+      "mode": "vfh",
+      "trial": 1,
+      "outcome": "SUCCEEDED",
+      "reason": "goal_reached",
+      "ready": true,
+      "elapsed_sim_seconds": 21.1,
+      "trajectory_length_m": 3.8070882351774165,
+      "minimum_observed_clearance_m": 0.7813696383019353,
+      "turn_reversals": 0,
+      "stuck_events": 0,
+      "collision_annotation": null
+    },
+    {
+      "scenario": "open_field",
+      "mode": "vfh_astar",
+      "trial": 1,
+      "outcome": "SUCCEEDED",
+      "reason": "goal_reached",
+      "ready": true,
+      "elapsed_sim_seconds": 21.200000000000003,
+      "trajectory_length_m": 3.8061932519542205,
+      "minimum_observed_clearance_m": 0.7823076801751803,
+      "turn_reversals": 0,
+      "stuck_events": 0,
+      "collision_annotation": null
+    }
+  ],
+  "single_obstacle": {
+    "mode": "vfh",
+    "slam_mode": "mapping",
+    "outcome": "SUCCEEDED",
+    "sim_time_seconds": 36.3,
+    "trajectory_length_m": 4.347369621424845,
+    "note": "Headless smoke; includes startup in sim_time. See /tmp/vfh_modular_gazebo_single_obstacle.log."
+  },
+  "corridor": {
+    "mode": "vfh",
+    "slam_mode": "mapping",
+    "outcome": "SUCCEEDED",
+    "sim_time_seconds": 24.1,
+    "trajectory_length_m": 3.8023763645848336,
+    "note": "Headless smoke before final scan-timing update; includes startup."
+  },
+  "u_world_live": {
+    "scenario": "u_world",
+    "mode": "vfh_astar",
+    "trial": 1,
+    "outcome": "TIMEOUT",
+    "reason": "unreachable",
+    "ready": true,
+    "elapsed_sim_seconds": 180.0,
+    "trajectory_length_m": 4.793590777981085e-11,
+    "minimum_observed_clearance_m": null,
+    "turn_reversals": 0,
+    "stuck_events": 0,
+    "collision_annotation": null
+  },
+  "u_world_model_grid": {
+    "resolution_m": 0.05,
+    "safe_radius_m": 0.43,
+    "outcome": "success",
+    "route_length_m": 13.440559159102158,
+    "note": "Conservative raster of actual SDF geometry, not a SLAM map or a live following result."
+  },
+  "recorded_u_slam_map": {
+    "point_robot": "success",
+    "radius_0_33_m": "unreachable",
+    "radius_0_43_m": "unreachable",
+    "note": "Offline replay of first recorded map; do not reduce the experimental footprint to force a route."
+  },
+  "collision_truth": "Not instrumented; observed clearance and goal success are not collision ground truth."
+}
